@@ -1,0 +1,49 @@
+name: Trivy SBOM and Vulnerability Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Trivy filesystem scan (vulnerabilities)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          format: "json"
+          output: "trivy-vuln-report.json"
+
+      - name: Generate SBOM with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          format: "cyclonedx"
+          output: "trivy-sbom.json"
+
+      - name: Wrap JSON report into HTML
+        run: |
+          echo "<html><body><h1>Trivy vulnerability report</h1><pre>" > trivy-report.html
+          cat trivy-vuln-report.json | jq '.' >> trivy-report.html
+          echo "</pre></body></html>" >> trivy-report.html
+
+      - name: Upload Trivy artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-artifacts
+          path: |
+            trivy-vuln-report.json
+            trivy-sbom.json
+            trivy-report.html
